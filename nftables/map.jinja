@@ -1,0 +1,3 @@
+{%- import_yaml "nftables/defaults.yaml" as defaults -%}
+
+{%- set nftables = salt['pillar.get']('nftables:lookup', defaults.nftables, merge=True) -%}

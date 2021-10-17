@@ -1,0 +1,84 @@
+nftables:
+  # Define sets
+  defines:
+    http:
+      - http
+      - https
+
+  # Use default table (`table inet filter`). If `tables` is defined, these
+  #   values are merged with the `table:filter` table, with the `table:filter`
+  # values taking priority.
+  chains:
+    # Chain name
+    input:
+      # Chain hook (optional): `prerouting`, `input`, `forward`, `output`,
+      #   `postrouting`, or `ingress`
+      hook: input
+      # Chain type (optional): ignored if no `hook` is set (default: `filter`)
+      type: filter
+      # Chain priority (optional): (default: `0`)
+      priority: 1
+      # Default chain policy (optional): (default: implicitly `accept` as per
+      #   nftables default)
+      policy: drop
+      # Chain rules: can be a string, list, or dict
+      ## rules using a list
+      rules:
+        - ct state invalid drop
+        - ct state established,related accept
+        - iif lo accept
+        - tcp dport { ssh }} accept
+        - tcp dport { $http }} accept
+        - counter drop
+
+      ## rules using a string
+      rules: |-
+        ct state invalid drop
+        ct state established,related accept
+        iif lo accept
+        tcp dport { ssh }} accept
+        tcp dport { $http }} accept
+        counter drop
+
+      ## rules using a dict: values can be any valid rule value, including
+      ##   recursive dicts (useful for merging rules from multiple pillar
+      ##   files)
+      rules:
+        100_general:
+          - ct state invalid drop
+          - ct state established,related accept
+          - iif lo accept
+
+        200_services:
+          210_ssh:
+            - tcp dport { ssh }} accept
+          220_http: |-
+            tcp dport { $http }} accept
+
+        999_default: |-
+          counter drop
+
+    output:
+      hook: output
+      rules:
+        - ct state invalid drop
+        - ct state established,related accept
+        - iif lo accept
+        - tcp dport { ssh }} accept
+        - tcp dport { $http }} accept
+
+  # Use if multiple tables required. If `tables` is defined, `chains` is merged
+  #   with the `tables:filter` table, with these values take priority.
+  tables:
+    # Table name
+    firewall:
+      # Table family: `ip`, `arp`, `ip6`, `bridge`, `inet`, or `netdev`
+      #   (default: `inet`)
+      family: ip
+      chains:
+        ... (as per `chains` above) ...
+
+    firewall_ip6:
+      family: ip6
+      chains:
+        ...

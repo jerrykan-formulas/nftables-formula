@@ -1,0 +1,54 @@
+{%- set conf = salt['pillar.get']('nftables', {}) -%}
+
+{%- macro print_rules(rules) -%}
+  {%- if rules is string %}
+    {{- '\n' ~ rules }}
+  {%- elif rules is mapping %}
+    {%- for name, sub_rules in rules|dictsort %}
+      {{- print_rules(sub_rules) }}
+      {%- if not loop.last %}{{ '\n' }}{%- endif %}
+    {%- endfor %}
+  {%- elif rules is sequence %}
+    {%- for rule in rules %}
+      {{- '\n' ~ rule }}
+    {%- endfor %}
+  {%- endif %}
+{%- endmacro -%}
+
+{%- set tables = {
+  'filter': {'chains': conf.get('chains', {})}
+} -%}
+{%- set tables = salt['pillar.get']('nftables:tables', tables, merge=True) -%}
+
+#!/usr/sbin/nft -f
+
+# This file is managed by salt. Manual changes risk being overwritten.
+
+flush ruleset
+
+{%- for name, values in conf.get('defines', {})|dictsort %}{{ '\n' }}
+define {{ name }} = {
+    {{ values|join(',\n')|indent(4) }}
+}
+  {%- if loop.last %}{{ '\n' }}{%- endif %}
+{%- endfor %}
+
+{%- for table_name, table in tables|dictsort %}
+table {{ table.get('family', 'inet') }} {{ table.get('name', table_name) }} {
+  {%- for chain_name, chain in table.get('chains', {})|dictsort %}
+    chain {{ chain.get('name', chain_name) }} {
+      {%- if 'hook' in chain %}
+        type {{ chain.get('type', 'filter') }} hook {{ chain.hook }} priority {{ chain.get('priority', 0) }};
+      {%- endif %}
+      {%- if 'policy' in chain %}
+        policy {{ chain.policy }}
+      {%- endif %}
+
+      {%- set rules = chain.get('rules', []) %}
+        {{ print_rules(rules)|indent(8) }}
+    }
+    {%- if not loop.last %}{{ '\n' }}{%- endif %}
+  {%- endfor %}
+}
+{%- if not loop.last %}{{ '\n' }}{%- endif %}
+{%- endfor %}

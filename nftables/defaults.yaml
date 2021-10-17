@@ -1,0 +1,5 @@
+nftables:
+  package: nftables
+  service: nftables
+  nft_cmd: /usr/sbin/nft
+  conf_file: /etc/nftables.conf
